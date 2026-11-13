@@ -18,7 +18,7 @@ run sw_vers
 run uptime
 run "sysctl -n kern.boottime"
 run "system_profiler SPHardwareDataType | grep -E 'Model|Processor|Cores|Memory|Chip'"
-run "system_profiler SPDisplaysDataType | grep -E 'Chipset|VRAM|Resolution|Display Type|Connection|Online|Main Display'"
+run "system_profiler SPDisplaysDataType | grep -E 'Chipset|VRAM|Resolution|Display Type|Connection|Online|Main Display|Looks like'"
 run "pmset -g | grep -i gpuswitch"   # 0 = только Intel, 1 = только AMD, 2 = авто (значения сверить)
 
 section "Тепло и троттлинг"

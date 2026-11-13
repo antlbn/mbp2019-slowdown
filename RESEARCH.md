@@ -43,6 +43,24 @@
 
 ---
 
+## 1а. Общие причины, по которым любой Intel-Mac тупеет на новых macOS
+
+Это фон, который действует независимо от наших конкретных находок. Большинство пунктов нельзя «выключить», но полезно понимать, сколько скорости отнято навсегда, а сколько можно вернуть.
+
+| ID | Причина | P | ★ | Рычаг | Наш статус |
+|---|---|---|---|---|---|
+| G01 | **Лавина фоновых задач.** Планировщик DAS-CTS: Ventura — «свыше 300», Sequoia — «свыше 500», 2026 — ~700 фоновых активностей. Каждая по отдельности копеечная, вместе — постоянный шум пробуждений | P2 (Eclectic Light, замеры) | ★★ | Почти нет: SSV и DAS не дают урезать систему (Eclectic Light, «Can you slim macOS down?», 2026) | доверились: eclecticlight.co |
+| G02 | **Intel — второсортная мишень.** Код и фреймворки пишутся под Apple Silicon; разрыв между платформами на одной версии macOS растёт (Ars Technica о Sequoia). Tahoe — последняя для Intel, доводки не будет | P2 | ★★ | Откат ОС или смена железа | доверились: Ars Technica |
+| G03 | **ML-функции без нейроядра.** Live Text, Visual Look Up, анализ фото, семантический Spotlight на Apple Silicon идут на Neural Engine, а на Intel — на CPU/GPU | P1 (механизм) | ★–★★ | Пауза демонов (см. C05) | не проверяли |
+| G04 | **Интерфейс дорожает каждый год.** Размытие, прозрачность, Liquid Glass; переписанные на SwiftUI системные приложения (Системные настройки с Ventura) | P2 | ★★ | Универсальный доступ: уже использован | проверили прямо: «Уменьшить прозрачность» вкл., тормоза остались |
+| G05 | **Заплатки безопасности процессора.** Spectre/Meltdown/MDS, затем Downfall (2023, затрагивает Skylake — Tiger Lake, т. е. и наш Coffee Lake): до десятков процентов в отдельных AVX2-нагрузках. Применила ли Apple микрокод Downfall — **не ясно** | P1 | ★ (в узких задачах ★★) | Не трогаем: отключение защит — плохая сделка | не проверяли |
+| G06 | **Масштабированное разрешение.** Если в «Мониторах» выбрано не «по умолчанию» (1536×960 ×2), а «больше места», GPU рендерит больший кадр и затем ужимает его — заметная нагрузка на UHD 630 | P1 | ★–★★ | Вернуть стандартное масштабирование | **проверим**: скрипт теперь выводит «UI Looks like» |
+| G07 | **Тяжёлый современный софт.** Electron-приложения (VS Code, Discord, Google Drive, Claude), веб-страницы тяжелеют; ВМ для песочниц | P1 | ★★ | Замена, закрытие, выгрузка | проверили прямо: отчёт №3 (ВМ Claude, Google Drive, VS Code) |
+| G08 | **Старение железа.** Термопаста, пыль, батарея на исходе | P3 | ★★★ | Обслуживание | проверили прямо: E02 (75 °C при 2 Вт) |
+| G09 | **Мало места на APFS-диске.** Своп, кэши и снимки делят одно свободное пространство | P1 | ★★ | Чистка до 50–70 ГБ | проверили прямо: 15 → 33 ГБ, цель не достигнута |
+
+---
+
 ## 2. Шкалы оценки
 
 **«Проверено людьми» (P)** — сколько независимых свидетельств:
@@ -292,7 +310,7 @@
 | 13.11 | `pmset -b gpuswitch 0` | — | **Отклонено владельцем** как костыль | A18e |
 | 13.11 | Отчёт №2: FanControl выкл., диск расчищен | `collect-facts.sh` (старая версия, без sudo), батарея | см. §3в | C08, C16, C17 |
 | 13.11 | Отчёт №3 с sudo | `collect-facts.sh` (новая версия), батарея | CPU 75 °C при 2 Вт, троттлинга нет, WindowServer 1 %, ВМ Claude — 800 пробуждений/с; GPU по процессам на Intel не работает | C04, C16, C18, C19, C20 |
-| — | E02: Telegram закрыт → температура | запланировано | — | C18 vs C04 |
+| 13.11 | E02: Telegram закрыт → температура | `powermetrics --samplers smc`, два прогона | GPU die **59 → 35 °C** (AMD отключилась сразу). CPU die **69–76 °C** при ~2 Вт — **почти не изменился** → версия (б): термоинтерфейс. Владелец: «термопасту менять — 100 %». Оговорка: 5 минут паузы, вероятно, не выдерживались | C18 ✔, C04 ✔ |
 | — | Перезагрузка + отчёт | запланировано | — | C16 |
 
 ---
@@ -339,6 +357,20 @@ S3 — кандидат в «нашу утилиту»: переключение
 
 ---
 
+## 5а. Дорожная карта: будущий виджет (идея владельца, «сильно позже»)
+
+Приложение-виджет на рабочем столе, которое в реальном времени показывает, какие из найденных причин активны сейчас, с кнопкой действия рядом:
+- ML-демоны работают → «приостановить»
+- кто держит AMD → имя приложения, «закрыть»
+- WindowServer / kernel_task выше порога
+- температура CPU и обороты вентилятора
+- свободное место и своп
+- источники пробуждений (ВМ, Electron)
+
+Данные для него уже умеет собирать `collect-facts.sh`; задача будущего — превратить разовый снимок в постоянный монитор.
+
+---
+
 ## 6. Источники (этап 1, только поиск, страницы не открывались)
 
 - [MacRumors: Tahoe performance on Intel](https://forums.macrumors.com/threads/macos-tahoe-performance-on-intel.2474392/)
@@ -376,3 +408,10 @@ S3 — кандидат в «нашу утилиту»: переключение
 - [Apple Developer Forums: MetalKit app launches slow, kernel_task kicks in](https://developer.apple.com/forums/thread/692769)
 - [Zed commit: prefer low-power GPU on macOS](https://git.secluded.site/zed/commit/bb514c158e1604916b32fc8c9bbe602a78727742)
 - [Developer PSA: The Discrete GPU and You](https://supermegaultragroovy.com/2016/12/10/auto-graphics-switching/)
+- [Eclectic Light: How DAS starts up and loads 700 background activities (2026)](https://eclecticlight.co/2026/07/20/how-das-starts-up-and-loads-700-background-activities/)
+- [Eclectic Light: Can you slim macOS down? (2026)](https://eclecticlight.co/2026/01/21/can-you-slim-macos-down/)
+- [Eclectic Light: Watch your background — DAS-CTS](https://eclecticlight.co/2025/01/29/watch-your-background-background-activities-with-das-cts/)
+- [Ars Technica: macOS 15 Sequoia review](https://arstechnica.com/gadgets/2024/09/macos-15-sequoia-the-ars-technica-review)
+- [Intego: Does the Downfall vulnerability affect Intel Macs?](https://www.intego.com/mac-security-blog/does-the-downfall-vulnerability-affect-intel-macs/)
+- [Phoronix: Downfall mitigation benchmarks](https://phoronix.com/review/intel-downfall-benchmarks)
+- [AppleInsider: Daemons and agents could be slowing down your Mac](https://appleinsider.com/inside/macos/tips/daemons-and-agents-could-be-slowing-down-your-mac)
