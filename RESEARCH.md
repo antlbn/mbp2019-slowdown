@@ -199,7 +199,8 @@
 - **A12c** · Выключить агенты Adobe/Autodesk/Zoom/Wacom/Google в «Объекты входа» · R1
 
 ### Атака на C18 (Telegram держит AMD), по возрастанию радикальности
-- **A18b** · Telegram → Настройки → «Энергосбережение» (Power Saving, с 2023 г.) — выключает анимации, автовоспроизведение видео и GIF. Отпускает ли при этом AMD — **неизвестно**, проверим · R1 · P1
+- **A18b** · Telegram → Настройки → «Энергосбережение» / анимации выкл. · R1 · P1 · **проверили прямо 13.11: не помогает** — после перезапуска AMD всё равно занята
+- **A18f** · Проверить флаг `NSSupportsAutomaticGraphicsSwitching` в Info.plist Telegram (только чтение). Если флага нет — причина найдена; правка plist ломает подпись приложения и слетает при обновлении (R2, P1 по другим программам: Double Commander — помогло; Mozilla VPN — флаг был, а не помогло)
 - **A18c** · Telegram в Safari (web.telegram.org) вместо приложения на батарее · R1 · P0
 - **A18d** · Закрывать Telegram, работая от батареи · R1
 - **A18e** · `sudo pmset -b gpuswitch 0` — на батарее только Intel, кто бы что ни просил; откат `sudo pmset -b gpuswitch 2` · R1 · P1 (в обсуждениях есть сомнения, работает ли на новых macOS — проверим) · основа стратегии S3
@@ -221,6 +222,8 @@
 | 13.11 | Отчёт №1 | `collect-facts.sh` без sudo, батарея, обычная работа | см. §3а | все |
 | 13.11 | Поиск, кто держит AMD | Мониторинг системы → «Энергия» → «Требуется высокопроизв. GPU» | **Telegram** | C18 |
 | 13.11 | FanControl отключён | Наблюдение владельца: не реагировал на ручные настройки, 14 % CPU | Гипотеза владельца: не получил прав на helper и крутился вхолостую без видимой ошибки. Ждём отчёт №2 | C17 |
+| 13.11 | Telegram: анимации выкл., перезапуск | Мониторинг системы → «Энергия» | **Не помогло**, AMD по-прежнему занята | C18, A18b |
+| — | `pmset -b gpuswitch 0` | запланировано | — | C18, A18e |
 | — | Перезагрузка + отчёт №2 с sudo | запланировано | — | C16, C04, C17 |
 
 ---
@@ -298,3 +301,5 @@ S3 — кандидат в «нашу утилиту»: переключение
 - [Devolutions forum: Metal context triggers discrete GPU](https://forum.devolutions.net/topics/33798/rdp-on-macbook-pro-and-discrete-video-card)
 - [Quassel bug: forces high performance GPU](https://bugs.quassel-irc.org/issues/1498)
 - [Mole: Mac fan control apps compared](https://mole.fit/blog/mac-fan-control-apps)
+- [Double Commander: NSSupportsAutomaticGraphicsSwitching fix](https://doublecmd.sourceforge.io/mantisbt/view.php?id=1668)
+- [Mozilla VPN: discrete GPU on Intel MacBooks](https://https-github_com.proxy.bugsmash.io/mozilla-mobile/mozilla-vpn-client/issues/9660)
