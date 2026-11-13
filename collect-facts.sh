@@ -3,9 +3,11 @@
 # Уровень R0: ТОЛЬКО ЧТЕНИЕ, ничего в системе не меняет.
 # Запуск:          bash collect-facts.sh            (без sudo, базовый отчёт)
 #                  sudo bash collect-facts.sh       (+ температуры, частоты, мощность)
-# Результат: файл mbp-facts-<дата>.txt рядом со скриптом.
+# Результат: reports/<дата>-<battery|ac>.txt (имя пользователя замаскировано).
 
-OUT="$(cd "$(dirname "$0")" && pwd)/mbp-facts-$(date +%Y%m%d-%H%M%S).txt"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+mkdir -p "$DIR/reports"
+OUT="$DIR/reports/$(date +%Y-%m-%d-%H%M)-$( [ "$(pmset -g batt | head -1 | grep -c Battery)" = 1 ] && echo battery || echo ac).txt"
 
 section() { printf '\n===== %s =====\n' "$1"; }
 run()     { printf '$ %s\n' "$*"; eval "$@" 2>&1; }
@@ -13,6 +15,8 @@ run()     { printf '$ %s\n' "$*"; eval "$@" 2>&1; }
 {
 section "Система и модель"
 run sw_vers
+run uptime
+run "sysctl -n kern.boottime"
 run "system_profiler SPHardwareDataType | grep -E 'Model|Processor|Cores|Memory|Chip'"
 run "system_profiler SPDisplaysDataType | grep -E 'Chipset|VRAM|Resolution|Display Type|Connection|Online|Main Display'"
 run "pmset -g | grep -i gpuswitch"   # 0 = только Intel, 1 = только AMD, 2 = авто (значения сверить)
@@ -31,7 +35,7 @@ run sysctl vm.swapusage
 run "vm_stat | head -n 12"
 
 section "Диск"
-run "df -h /"
+run "df -h / /System/Volumes/Data"   # свободное место смотреть по Data
 run "tmutil listlocalsnapshots / | wc -l"
 
 section "Spotlight"
@@ -66,6 +70,7 @@ if [ "$(id -u)" -eq 0 ]; then
 else
   section "powermetrics пропущен (нужен sudo)"
 fi
-} > "$OUT"
+} | sed "s#/Users/[^/]*/#/Users/<user>/#g" > "$OUT"   # имя пользователя маскируется
 
+[ -n "$SUDO_USER" ] && chown -R "$SUDO_USER" "$DIR/reports"   # чтобы отчёт не принадлежал root
 echo "Готово: $OUT"

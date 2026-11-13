@@ -1,0 +1,193 @@
+
+===== Система и модель =====
+$ sw_vers
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+$ system_profiler SPHardwareDataType | grep -E 'Model|Processor|Cores|Memory|Chip'
+      Model Name: MacBook Pro
+      Model Identifier: MacBookPro16,1
+      Processor Name: 6-Core Intel Core i7
+      Processor Speed: 2.6 GHz
+      Number of Processors: 1
+      Total Number of Cores: 6
+      Memory: 16 GB
+$ system_profiler SPDisplaysDataType | grep -E 'Chipset|VRAM|Resolution|Display Type|Connection|Online|Main Display'
+      Chipset Model: Intel UHD Graphics 630
+      VRAM (Dynamic, Max): 1536 MB
+      Chipset Model: AMD Radeon Pro 5300M
+      VRAM (Total): 4 GB
+          Display Type: Built-In Retina LCD
+          Resolution: 3072 x 1920 Retina
+          Main Display: Yes
+          Online: Yes
+          Connection Type: Internal
+$ pmset -g | grep -i gpuswitch
+ gpuswitch            2
+
+===== Тепло и троттлинг =====
+$ pmset -g therm
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+2026-11-13 17:36:25 +0100 CPU Power notify
+	CPU_Scheduler_Limit 	= 100
+	CPU_Available_CPUs 	= 12
+	CPU_Speed_Limit 	= 100
+$ pmset -g | grep -Ei 'gpuswitch|lowpowermode|powernap|sleep'
+ lowpowermode         0
+ gpuswitch            2
+ powernap             0
+ hibernatefile        /var/vm/sleepimage
+ displaysleep         2
+ networkoversleep     0
+ sleep                1 (sleep prevented by Claude, sharingd)
+ disksleep            10
+
+===== Питание и аккумулятор =====
+$ pmset -g batt
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=8912995)	88%; discharging; 2:25 remaining present: true
+$ system_profiler SPPowerDataType | grep -E 'Cycle Count|Condition|Maximum Capacity|Wattage|Connected'
+          Cycle Count: 1189
+          Condition: Service Recommended
+      Connected: No
+
+===== Память =====
+$ memory_pressure | tail -n 3
+Pageouts: 294472 
+
+System-wide memory free percentage: 69%
+$ sysctl vm.swapusage
+vm.swapusage: total = 6144.00M  used = 5111.75M  free = 1032.25M  (encrypted)
+$ vm_stat | head -n 12
+Mach Virtual Memory Statistics: (page size of 4096 bytes)
+Pages free:                                     5998.
+Pages active:                                1457557.
+Pages inactive:                              1459517.
+Pages speculative:                               883.
+Pages throttled:                                   0.
+Pages wired down:                             855074.
+Pages purgeable:                              257286.
+"Translation faults":                      284450871.
+Pages copy-on-write:                         5026967.
+Pages zero filled:                         233979480.
+Pages reactivated:                          29133583.
+
+===== Диск =====
+$ df -h /
+Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk1s6s1   466Gi    12Gi    15Gi    45%    459k  152M    0%   /
+$ tmutil listlocalsnapshots / | wc -l
+       1
+
+===== Spotlight =====
+$ mdutil -sa
+/:
+	Indexing enabled. 
+/System/Volumes/Data:
+	Indexing enabled. 
+/System/Volumes/Preboot:
+	Indexing enabled. 
+
+===== Топ процессов по CPU (2 замера, берётся второй) =====
+$ top -l 2 -o cpu -n 15 -stats pid,command,cpu,mem,threads | tail -n 17
+
+PID    COMMAND          %CPU MEM    #TH   
+250    WindowServer     24.7 819M+  14/1  
+29476  top              15.0 5796K+ 1/1   
+20995  FanControl       14.2 60M+   8     
+0      kernel_task      6.0  188M-  325/12
+189    bluetoothd       1.6  8120K  11    
+1257   Google Drive Hel 1.4  35M+   20    
+7757   com.apple.Virtua 1.4  689M   20    
+334    mDNSResponder    1.0  8460K+ 4     
+461    TouchBarServer   0.9  32M-   7     
+572    Finder           0.6  298M   9     
+166    launchservicesd  0.5  6336K  3     
+256    loginwindow      0.5  42M    2     
+171    locationd        0.4  8404K- 8     
+261    runningboardd    0.4  9724K- 6     
+568    ControlCenter    0.4  78M+   9     
+
+===== Топ процессов по памяти =====
+$ top -l 1 -o mem -n 12 -stats pid,command,mem,cpu | tail -n 13
+PID    COMMAND          MEM   %CPU
+7308   Claude Helper (R 1180M 0.0 
+23122  com.apple.WebKit 893M  0.0 
+250    WindowServer     819M  0.0 
+22291  com.apple.WebKit 797M  0.0 
+6574   com.apple.WebKit 707M  0.0 
+7757   com.apple.Virtua 689M  0.0 
+556    Safari           545M  0.0 
+24541  Telegram         486M  0.0 
+7675   com.apple.WebKit 467M  0.0 
+11542  Google Chrome He 388M  0.0 
+5682   Discord Helper ( 349M  0.0 
+6979   Claude Helper    326M  0.0 
+
+===== Фоновые ML/индексация — запущены ли сейчас =====
+$ ps -axo pid,%cpu,%mem,etime,comm | grep -Ei 'mediaanalysisd|photoanalysisd|photolibraryd|mds|mdworker|corespotlight|knowledge|suggestd|WindowServer|kernel_task' | grep -v grep
+  151   0.8  0.1 20769-19:43:11 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds
+  250  40.9  0.7 20769-19:43:11 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+  361   0.4  0.4 20769-19:43:09 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores
+  500   0.0  0.1    06-16:44:40 /usr/libexec/knowledge-agent
+  553   0.0  0.0    06-16:44:39 /usr/libexec/siriknowledged
+  595   0.0  0.2    06-16:44:38 /System/Library/PrivateFrameworks/CoreSuggestions.framework/Versions/A/Support/suggestd
+  626   0.0  0.2    06-16:44:37 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd
+  675   0.0  0.0    06-16:44:33 /usr/libexec/spotlightknowledged.updater
+  704   0.0  0.1    06-16:44:29 /System/Library/PrivateFrameworks/PhotoLibraryServices.framework/Versions/A/Support/photolibraryd
+  718   0.0  0.1    06-16:44:28 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd
+  734   0.0  0.0    06-16:44:26 /System/Library/PrivateFrameworks/PhotoAnalysis.framework/Versions/A/Support/photoanalysisd
+ 1326   0.0  0.0    04-07:15:57 /System/Library/Frameworks/CoreSpotlight.framework/spotlightknowledged
+ 1356   0.0  0.0    04-07:15:54 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker
+ 1998   0.0  0.0    04-07:08:37 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/managedcorespotlightd
+ 3481   0.0  0.0    03-19:32:27 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker
+28673   0.1  0.1          02:59 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+29466   0.0  0.1          00:06 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+29498  16.2  0.1          00:00 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+
+===== Визуальные настройки =====
+$ defaults read com.apple.universalaccess reduceTransparency
+1
+$ defaults read com.apple.universalaccess reduceMotion
+1
+
+===== Сторонние расширения =====
+$ kextstat 2>/dev/null | grep -v com.apple | tail -n +2
+$ systemextensionsctl list
+2 extension(s)
+--- com.apple.system_extension.driver_extension (Go to 'System Settings > General > Login Items & Extensions > Driver Extensions' to modify these system extension(s))
+enabled	active	teamID	bundleID (version)	name	[state]
+*	*	5JZGQTGU4W	cn.wch.CH34xVCPDriver (1.0/1)	cn.wch.CH34xVCPDriver	[activated enabled]
+	*	52444FG85C	com.silabs.cp210x (6.0.3/1)	com.silabs.cp210x	[activated waiting for user]
+
+===== Автозагрузка (сторонние агенты) =====
+$ ls /Library/LaunchAgents /Library/LaunchDaemons ~/Library/LaunchAgents
+/Library/LaunchAgents:
+com.adobe.AdobeCreativeCloud.plist
+com.adobe.AdobeDesktopService.plist
+com.adobe.ccxprocess.plist
+com.wacom.DataStoreMgr.plist
+com.wacom.IOManager.plist
+com.wacom.wacomtablet.plist
+us.zoom.updater.login.check.plist
+us.zoom.updater.plist
+
+/Library/LaunchDaemons:
+AmneziaVPN.plist
+com.adobe.acc.installer.v2.plist
+com.autodesk.adskaccessservicehost.plist
+com.autodesk.AdskLicensingService.plist
+com.autodesk.cer.plist
+com.docker.socket.plist
+com.docker.vmnetd.plist
+com.silabs.installer-helper.plist
+com.wacom.UpdateHelper.plist
+us.zoom.ZoomDaemon.plist
+
+/Users/<user>/Library/LaunchAgents:
+com.google.GoogleUpdater.wake.plist
+com.google.keystone.agent.plist
+com.google.keystone.xpcservice.plist
+
+===== powermetrics пропущен (нужен sudo) =====
