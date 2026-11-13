@@ -1,0 +1,363 @@
+
+===== Система и модель =====
+$ sw_vers
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+$ uptime
+18:02  up 4 days,  7:43, 5 users, load averages: 1.51 2.06 2.87
+$ sysctl -n kern.boottime
+{ sec = 1794215957, usec = 486620 } Mon Nov  9 10:19:17 2026
+$ system_profiler SPHardwareDataType | grep -E 'Model|Processor|Cores|Memory|Chip'
+      Model Name: MacBook Pro
+      Model Identifier: MacBookPro16,1
+      Processor Name: 6-Core Intel Core i7
+      Processor Speed: 2.6 GHz
+      Number of Processors: 1
+      Total Number of Cores: 6
+      Memory: 16 GB
+$ system_profiler SPDisplaysDataType | grep -E 'Chipset|VRAM|Resolution|Display Type|Connection|Online|Main Display'
+      Chipset Model: Intel UHD Graphics 630
+      VRAM (Dynamic, Max): 1536 MB
+      Chipset Model: AMD Radeon Pro 5300M
+      VRAM (Total): 4 GB
+          Display Type: Built-In Retina LCD
+          Resolution: 3072 x 1920 Retina
+          Main Display: Yes
+          Online: Yes
+          Connection Type: Internal
+$ pmset -g | grep -i gpuswitch
+ gpuswitch            2
+
+===== Тепло и троттлинг =====
+$ pmset -g therm
+Note: No thermal warning level has been recorded
+Note: No performance warning level has been recorded
+2026-11-13 18:02:19 +0100 CPU Power notify
+	CPU_Scheduler_Limit 	= 100
+	CPU_Available_CPUs 	= 12
+	CPU_Speed_Limit 	= 100
+$ pmset -g | grep -Ei 'gpuswitch|lowpowermode|powernap|sleep'
+ lowpowermode         0
+ gpuswitch            2
+ powernap             0
+ hibernatefile        /var/vm/sleepimage
+ displaysleep         2
+ networkoversleep     0
+ sleep                1 (sleep prevented by Claude, sharingd)
+ disksleep            10
+
+===== Питание и аккумулятор =====
+$ pmset -g batt
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=8912995)	68%; discharging; 2:20 remaining present: true
+$ system_profiler SPPowerDataType | grep -E 'Cycle Count|Condition|Maximum Capacity|Wattage|Connected'
+          Cycle Count: 1190
+          Condition: Service Recommended
+      Connected: No
+
+===== Память =====
+$ memory_pressure | tail -n 3
+Pageouts: 315383 
+
+System-wide memory free percentage: 73%
+$ sysctl vm.swapusage
+vm.swapusage: total = 7168.00M  used = 6366.75M  free = 801.25M  (encrypted)
+$ vm_stat | head -n 12
+Mach Virtual Memory Statistics: (page size of 4096 bytes)
+Pages free:                                     8534.
+Pages active:                                1527624.
+Pages inactive:                              1525554.
+Pages speculative:                              1176.
+Pages throttled:                                   0.
+Pages wired down:                             877644.
+Pages purgeable:                              251522.
+"Translation faults":                      314400982.
+Pages copy-on-write:                         6551165.
+Pages zero filled:                         255061304.
+Pages reactivated:                          31868973.
+
+===== Диск =====
+$ df -h / /System/Volumes/Data
+Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk1s6s1   466Gi    12Gi    33Gi    27%    459k  349M    0%   /
+/dev/disk1s5     466Gi   406Gi    33Gi    93%    3.6M  349M    1%   /System/Volumes/Data
+$ tmutil listlocalsnapshots / | wc -l
+       1
+
+===== Spotlight =====
+$ mdutil -sa
+/:
+	Indexing enabled. 
+/System/Volumes/Data:
+	Indexing enabled. 
+/System/Volumes/Preboot:
+	Indexing enabled. 
+
+===== Топ процессов по CPU (2 замера, берётся второй) =====
+$ top -l 2 -o cpu -n 15 -stats pid,command,cpu,mem,threads | tail -n 17
+
+PID    COMMAND          %CPU MEM    #TH   
+42406  top              15.4 5820K+ 1/1   
+0      kernel_task      3.9  200M-  323/13
+7757   com.apple.Virtua 1.9  689M   20    
+480    sysmond          1.8  4196K+ 2     
+1257   Google Drive Hel 1.5  39M+   20    
+21670  Activity Monitor 1.5  99M+   10    
+250    WindowServer     1.3  974M   14    
+334    mDNSResponder    1.0  9348K  4     
+556    Safari           0.7  543M   15    
+267    coreaudiod       0.5  19M    8     
+171    locationd        0.5  8416K  8     
+1236   Google Drive Hel 0.3  67M    9     
+461    TouchBarServer   0.3  32M    7     
+189    bluetoothd       0.3  8192K  10    
+39110  Telegram         0.3  459M   14    
+
+===== Топ процессов по памяти =====
+$ top -l 1 -o mem -n 12 -stats pid,command,mem,cpu | tail -n 13
+PID    COMMAND          MEM   %CPU
+7308   Claude Helper (R 1160M 0.0 
+250    WindowServer     974M  0.0 
+23122  com.apple.WebKit 896M  0.0 
+22291  com.apple.WebKit 796M  0.0 
+6574   com.apple.WebKit 707M  0.0 
+7757   com.apple.Virtua 689M  0.0 
+24436  com.apple.WebKit 578M  0.0 
+556    Safari           543M  0.0 
+7675   com.apple.WebKit 522M  0.0 
+39110  Telegram         459M  0.0 
+11542  Google Chrome He 389M  0.0 
+5682   Discord Helper ( 352M  0.0 
+
+===== Фоновые ML/индексация — запущены ли сейчас =====
+$ ps -axo pid,%cpu,%mem,etime,comm | grep -Ei 'mediaanalysisd|photoanalysisd|photolibraryd|mds|mdworker|corespotlight|knowledge|suggestd|WindowServer|kernel_task' | grep -v grep
+  151   0.0  0.2 20769-20:09:04 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds
+  250   0.6  1.0 20769-20:09:04 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+  361   0.0  0.4 20769-20:09:02 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores
+  500   0.0  0.1    06-17:10:33 /usr/libexec/knowledge-agent
+  553   0.0  0.1    06-17:10:32 /usr/libexec/siriknowledged
+  595   0.0  0.2    06-17:10:31 /System/Library/PrivateFrameworks/CoreSuggestions.framework/Versions/A/Support/suggestd
+  626   0.0  0.2    06-17:10:30 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd
+  675   0.0  0.0    06-17:10:26 /usr/libexec/spotlightknowledged.updater
+  704   0.0  0.1    06-17:10:22 /System/Library/PrivateFrameworks/PhotoLibraryServices.framework/Versions/A/Support/photolibraryd
+  718   0.0  0.1    06-17:10:21 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd
+  734   0.0  0.0    06-17:10:19 /System/Library/PrivateFrameworks/PhotoAnalysis.framework/Versions/A/Support/photoanalysisd
+ 1326   0.0  0.0    04-07:41:50 /System/Library/Frameworks/CoreSpotlight.framework/spotlightknowledged
+ 1356   0.0  0.0    04-07:41:47 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker
+ 1998   0.0  0.0    04-07:34:30 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/managedcorespotlightd
+ 3481   0.0  0.0    03-19:58:20 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker
+42054   0.0  0.1          00:22 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+42055   0.0  0.1          00:22 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+42161   0.0  0.1          00:22 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+42162   0.0  0.1          00:22 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+42164   0.0  0.0          00:21 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+
+===== Визуальные настройки =====
+$ defaults read com.apple.universalaccess reduceTransparency
+1
+$ defaults read com.apple.universalaccess reduceMotion
+2026-11-13 18:02:25.034 defaults[42449:631913] 
+The domain/default pair of (com.apple.universalaccess, reduceMotion) does not exist
+
+===== Сторонние расширения =====
+$ kextstat 2>/dev/null | grep -v com.apple | tail -n +2
+$ systemextensionsctl list
+2 extension(s)
+--- com.apple.system_extension.driver_extension (Go to 'System Settings > General > Login Items & Extensions > Driver Extensions' to modify these system extension(s))
+enabled	active	teamID	bundleID (version)	name	[state]
+*	*	5JZGQTGU4W	cn.wch.CH34xVCPDriver (1.0/1)	cn.wch.CH34xVCPDriver	[activated enabled]
+	*	52444FG85C	com.silabs.cp210x (6.0.3/1)	com.silabs.cp210x	[activated waiting for user]
+
+===== Автозагрузка (сторонние агенты) =====
+$ ls /Library/LaunchAgents /Library/LaunchDaemons ~/Library/LaunchAgents
+/Library/LaunchAgents:
+com.adobe.AdobeCreativeCloud.plist
+com.adobe.AdobeDesktopService.plist
+com.adobe.ccxprocess.plist
+com.wacom.DataStoreMgr.plist
+com.wacom.IOManager.plist
+com.wacom.wacomtablet.plist
+us.zoom.updater.login.check.plist
+us.zoom.updater.plist
+
+/Library/LaunchDaemons:
+AmneziaVPN.plist
+com.adobe.acc.installer.v2.plist
+com.autodesk.adskaccessservicehost.plist
+com.autodesk.AdskLicensingService.plist
+com.autodesk.cer.plist
+com.docker.socket.plist
+com.docker.vmnetd.plist
+com.silabs.installer-helper.plist
+com.wacom.UpdateHelper.plist
+us.zoom.ZoomDaemon.plist
+
+/Users/<user>/Library/LaunchAgents:
+.DS_Store
+com.google.GoogleUpdater.wake.plist
+com.google.keystone.agent.plist
+com.google.keystone.xpcservice.plist
+
+===== powermetrics: частоты, температура, вентилятор (5 с) =====
+$ powermetrics --samplers smc,cpu_power,gpu_power -i 1000 -n 5 | grep -Ei 'CPU die temperature|GPU die temperature|Fan|CPU Average frequency|Package Power|GPU Active|frequency as fraction'
+Intel energy model derived package power (CPUs+GT+SA): 1.77W
+System Average frequency as fraction of nominal: 60.76% (1579.88 Mhz)
+GPU Active: 0.00%
+CPU Average frequency as fraction of nominal: 58.60% (1523.58 Mhz)
+CPU Average frequency as fraction of nominal: 60.96% (1585.08 Mhz)
+CPU Average frequency as fraction of nominal: 60.99% (1585.63 Mhz)
+CPU Average frequency as fraction of nominal: 58.36% (1517.34 Mhz)
+CPU Average frequency as fraction of nominal: 60.21% (1565.59 Mhz)
+CPU Average frequency as fraction of nominal: 60.56% (1574.65 Mhz)
+CPU Average frequency as fraction of nominal: 64.11% (1666.91 Mhz)
+CPU Average frequency as fraction of nominal: 70.54% (1833.97 Mhz)
+CPU Average frequency as fraction of nominal: 59.70% (1552.21 Mhz)
+CPU Average frequency as fraction of nominal: 73.59% (1913.41 Mhz)
+CPU Average frequency as fraction of nominal: 80.03% (2080.71 Mhz)
+CPU Average frequency as fraction of nominal: 67.47% (1754.27 Mhz)
+GPU 0 average active frequency as fraction of nominal (350.00Mhz): 0.00% (0.00Mhz)
+Fan: 1840.3 rpm
+CPU die temperature: 75.83 C
+GPU die temperature: 56.00 C
+Intel energy model derived package power (CPUs+GT+SA): 2.49W
+System Average frequency as fraction of nominal: 75.91% (1973.66 Mhz)
+GPU Active: 0.00%
+CPU Average frequency as fraction of nominal: 74.54% (1937.95 Mhz)
+CPU Average frequency as fraction of nominal: 71.72% (1864.81 Mhz)
+CPU Average frequency as fraction of nominal: 75.72% (1968.78 Mhz)
+CPU Average frequency as fraction of nominal: 71.71% (1864.52 Mhz)
+CPU Average frequency as fraction of nominal: 77.76% (2021.84 Mhz)
+CPU Average frequency as fraction of nominal: 72.82% (1893.44 Mhz)
+CPU Average frequency as fraction of nominal: 79.73% (2072.99 Mhz)
+CPU Average frequency as fraction of nominal: 80.60% (2095.49 Mhz)
+CPU Average frequency as fraction of nominal: 71.06% (1847.61 Mhz)
+CPU Average frequency as fraction of nominal: 71.92% (1869.94 Mhz)
+CPU Average frequency as fraction of nominal: 79.84% (2075.97 Mhz)
+CPU Average frequency as fraction of nominal: 78.45% (2039.67 Mhz)
+GPU 0 average active frequency as fraction of nominal (350.00Mhz): 0.00% (0.00Mhz)
+Fan: 1835.48 rpm
+CPU die temperature: 75.28 C
+GPU die temperature: 56.00 C
+Intel energy model derived package power (CPUs+GT+SA): 2.23W
+System Average frequency as fraction of nominal: 71.49% (1858.69 Mhz)
+GPU Active: 0.00%
+CPU Average frequency as fraction of nominal: 65.65% (1706.89 Mhz)
+CPU Average frequency as fraction of nominal: 75.06% (1951.49 Mhz)
+CPU Average frequency as fraction of nominal: 70.20% (1825.31 Mhz)
+CPU Average frequency as fraction of nominal: 74.09% (1926.26 Mhz)
+CPU Average frequency as fraction of nominal: 72.57% (1886.82 Mhz)
+CPU Average frequency as fraction of nominal: 76.55% (1990.34 Mhz)
+CPU Average frequency as fraction of nominal: 83.35% (2167.02 Mhz)
+CPU Average frequency as fraction of nominal: 94.38% (2453.84 Mhz)
+CPU Average frequency as fraction of nominal: 75.71% (1968.34 Mhz)
+CPU Average frequency as fraction of nominal: 83.42% (2168.96 Mhz)
+CPU Average frequency as fraction of nominal: 78.93% (2052.09 Mhz)
+CPU Average frequency as fraction of nominal: 89.57% (2328.87 Mhz)
+GPU 0 average active frequency as fraction of nominal (350.00Mhz): 0.00% (0.00Mhz)
+Fan: 1840.24 rpm
+CPU die temperature: 74.73 C
+GPU die temperature: 55.00 C
+Intel energy model derived package power (CPUs+GT+SA): 1.95W
+System Average frequency as fraction of nominal: 66.71% (1734.51 Mhz)
+GPU Active: 0.00%
+CPU Average frequency as fraction of nominal: 64.61% (1679.95 Mhz)
+CPU Average frequency as fraction of nominal: 66.08% (1717.99 Mhz)
+CPU Average frequency as fraction of nominal: 69.73% (1812.89 Mhz)
+CPU Average frequency as fraction of nominal: 65.01% (1690.25 Mhz)
+CPU Average frequency as fraction of nominal: 69.28% (1801.16 Mhz)
+CPU Average frequency as fraction of nominal: 65.62% (1706.11 Mhz)
+CPU Average frequency as fraction of nominal: 64.90% (1687.49 Mhz)
+CPU Average frequency as fraction of nominal: 66.07% (1717.93 Mhz)
+CPU Average frequency as fraction of nominal: 65.11% (1692.87 Mhz)
+CPU Average frequency as fraction of nominal: 59.88% (1556.78 Mhz)
+CPU Average frequency as fraction of nominal: 67.09% (1744.39 Mhz)
+CPU Average frequency as fraction of nominal: 63.41% (1648.70 Mhz)
+GPU 0 average active frequency as fraction of nominal (350.00Mhz): 0.00% (0.00Mhz)
+Fan: 1833.45 rpm
+CPU die temperature: 74.19 C
+GPU die temperature: 55.00 C
+Intel energy model derived package power (CPUs+GT+SA): 9.55W
+System Average frequency as fraction of nominal: 118.43% (3079.05 Mhz)
+GPU Active: 0.00%
+CPU Average frequency as fraction of nominal: 94.70% (2462.33 Mhz)
+CPU Average frequency as fraction of nominal: 91.09% (2368.33 Mhz)
+CPU Average frequency as fraction of nominal: 137.96% (3586.84 Mhz)
+CPU Average frequency as fraction of nominal: 91.47% (2378.35 Mhz)
+CPU Average frequency as fraction of nominal: 111.53% (2899.68 Mhz)
+CPU Average frequency as fraction of nominal: 90.84% (2361.93 Mhz)
+CPU Average frequency as fraction of nominal: 91.93% (2390.28 Mhz)
+CPU Average frequency as fraction of nominal: 90.35% (2349.00 Mhz)
+CPU Average frequency as fraction of nominal: 102.99% (2677.66 Mhz)
+CPU Average frequency as fraction of nominal: 87.26% (2268.73 Mhz)
+CPU Average frequency as fraction of nominal: 111.16% (2890.20 Mhz)
+CPU Average frequency as fraction of nominal: 76.53% (1989.81 Mhz)
+GPU 0 average active frequency as fraction of nominal (350.00Mhz): 0.00% (0.00Mhz)
+Fan: 1817.85 rpm
+CPU die temperature: 73.66 C
+GPU die temperature: 55.00 C
+
+===== Кто грузит GPU: время GPU по процессам (5 с; на Intel может быть пусто — это тоже ответ) =====
+$ powermetrics --samplers tasks --show-process-coalition --show-process-gpu -n 1 -i 5000 | head -n 60
+proc_pidpath 1221 failed(0)
+proc_pidpath 1221 failed(0)
+Machine model: MacBookPro16,1
+SMC version: Unknown
+EFI version: 2103.2.0
+OS version: 25G83
+Boot arguments: 
+Boot time: Mon Nov  9 10:19:17 2026
+
+
+
+*** Sampled system activity (Fri Nov 13 18:02:36 2026 +0100) (5050.77ms elapsed) ***
+
+*** Running tasks ***
+
+Name                               ID     CPU ms/s  User%  Deadlines (<2 ms, 2-5 ms)  Wakeups (Intr, Pkg idle)  GPU ms/s
+com.anthropic.claudefordesktop     5239   55.77                                       860.20  600.28            0.00      
+  com.apple.Virtualization.Virtual 7757   41.31     38.59  803.17  0.00               803.17  564.61            0.00      
+  claude                           7914   5.92      81.41  0.00    0.00               14.45   8.91              0.00      
+  Claude                           6971   3.78      64.77  10.10   0.00               22.57   13.86             0.00      
+  claude                           7953   3.65      72.34  0.20    0.40               14.25   9.50              0.00      
+  Claude Helper (Renderer)         7308   0.87      91.63  0.00    0.00               3.37    2.18              0.00      
+  Claude Helper                    6981   0.34      43.48  0.00    0.00               0.59    0.40              0.00      
+  Claude Helper                    6979   0.14      48.82  0.00    0.00               0.20    0.00              0.00      
+  Claude Helper                    7328   0.05      67.81  0.00    0.00               0.40    0.20              0.00      
+  Claude Helper                    7831   0.03      63.23  0.00    0.00               0.20    0.20              0.00      
+  Claude Helper (Plugin)           7405   0.06      59.09  0.00    0.00               0.20    0.00              0.00      
+  Claude Helper (Plugin)           7898   0.05      65.23  0.00    0.00               0.20    0.00              0.00      
+  Claude Helper                    7386   0.05      67.45  0.00    0.00               0.40    0.00              0.00      
+  Claude Helper                    7802   0.04      62.14  0.00    0.00               0.20    0.00              0.00      
+  Claude Helper                    7387   0.04      70.52  0.00    0.00               0.20    0.00              0.00      
+kernel_coalition                   1      58.43                                       414.05  230.21            0.00      
+  kernel_task                      0      37.54     0.00   0.00    0.00               413.76  230.04            0.00      
+  launchd                          1      21.01     6.82   0.00    0.00               0.20    0.20              0.00      
+com.apple.ActivityMonitor          6984   80.96                                       2.97    2.18              0.00      
+  Activity Monitor                 21670  81.29     90.99  0.00    0.00               2.97    2.18              0.00      
+com.microsoft.VSCode               5709   39.69                                       133.92  37.64             0.00      
+  Code Helper                      9415   4.86      56.41  29.30   0.00               39.40   20.98             0.00      
+  Code Helper (Plugin)             30318  3.49      78.63  0.99    0.00               2.18    1.39              0.00      
+  Code Helper                      31453  1.88      31.30  5.35    0.00               10.89   5.35              0.00      
+  Code Helper (Plugin)             9417   2.75      77.06  0.59    0.00               1.39    0.59              0.00      
+  Code Helper (Plugin)             30456  1.61      20.23  0.40    0.00               0.79    0.00              0.00      
+  copilot-runtime                  9454   0.12      47.99  0.00    0.00               4.55    2.57              0.00      
+  Code Helper                      9414   0.39      53.42  0.40    0.00               0.99    0.99              0.00      
+  Code Helper                      30316  0.37      39.41  0.79    0.00               1.78    0.99              0.00      
+  Code                             9404   0.34      57.52  0.40    0.00               1.39    0.59              0.00      
+  Code Helper                      9416   0.20      40.17  0.40    0.00               0.99    0.59              0.00      
+  codex                            30718  0.07      55.22  0.00    0.00               0.99    0.59              0.00      
+  Code Helper (Renderer)           30302  0.16      71.91  0.00    0.00               0.40    0.00              0.00      
+  Code Helper (Renderer)           9409   0.15      70.23  0.00    0.00               0.20    0.00              0.00      
+  Code Helper                      9407   0.11      51.97  0.00    0.00               0.20    0.20              0.00      
+  Code Helper (Plugin)             9449   0.06      59.84  0.59    0.00               1.19    0.40              0.00      
+  Code Helper                      9408   0.03      65.68  0.00    0.00               0.20    0.20              0.00      
+  Code Helper                      30727  0.01      73.37  0.20    0.00               0.40    0.00              0.00      
+com.google.drivefs                 1027   32.24                                       35.86   20.80             0.00      
+  Google Drive Helper (Renderer)   1257   23.38     86.31  0.00    0.00               12.08   7.13              0.00      
+  Google Drive Helper (GPU)        1236   5.91      67.64  0.99    1.39               21.97   12.08             0.00      
+  Google Drive                     1233   3.50      75.50  0.00    0.00               2.18    1.78              0.00      
+com.apple.Safari                   571    17.73                                       153.14  92.72             0.00      
+  Safari                           556    11.73     61.79  0.00    0.00               128.09  77.60             0.00      
+  com.apple.WebKit.WebContent      24436  2.07      70.51  0.00    0.00               12.87   7.72              0.00      
+  com.apple.WebKit.GPU             791    2.38      79.34  0.00    0.00               7.92    4.75              0.00      
