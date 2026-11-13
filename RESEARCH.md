@@ -200,7 +200,8 @@
 
 ### Атака на C18 (Telegram держит AMD), по возрастанию радикальности
 - **A18b** · Telegram → Настройки → «Энергосбережение» / анимации выкл. · R1 · P1 · **проверили прямо 13.11: не помогает** — после перезапуска AMD всё равно занята
-- **A18f** · Проверить флаг `NSSupportsAutomaticGraphicsSwitching` в Info.plist Telegram (только чтение). Если флага нет — причина найдена; правка plist ломает подпись приложения и слетает при обновлении (R2, P1 по другим программам: Double Commander — помогло; Mozilla VPN — флаг был, а не помогло)
+- **A18f** · ~~Проверить флаг~~ **флаг = 1, опровергнуто 13.11.** Новая гипотеза (P1–P2): Telegram берёт видеокарту через `MTLCreateSystemDefaultDevice()`, а на Intel-Mac с двумя GPU она по умолчанию отдаёт дискретную. Правильный путь — перебрать устройства и выбрать `isLowPower`; так это исправили, например, в Zed. **Лечится только на стороне Telegram** → вариант A18g: баг-репорт разработчикам.
+- (было) Проверить флаг `NSSupportsAutomaticGraphicsSwitching` в Info.plist Telegram (только чтение). Если флага нет — причина найдена; правка plist ломает подпись приложения и слетает при обновлении (R2, P1 по другим программам: Double Commander — помогло; Mozilla VPN — флаг был, а не помогло)
 - **A18c** · Telegram в Safari (web.telegram.org) вместо приложения на батарее · R1 · P0
 - **A18d** · Закрывать Telegram, работая от батареи · R1
 - **A18e** · `sudo pmset -b gpuswitch 0` — на батарее только Intel, кто бы что ни просил; откат `sudo pmset -b gpuswitch 2` · R1 · P1 (в обсуждениях есть сомнения, работает ли на новых macOS — проверим) · основа стратегии S3
@@ -215,6 +216,23 @@
 
 ---
 
+## 3в. Отчёт №2 против №1 (17:55, FanControl выключен, диск расчищен)
+
+Файл: `reports/2026-11-13-1755-battery-nofancontrol.txt`
+
+| Показатель | №1 (17:36) | №2 (17:55) | Вывод |
+|---|---|---|---|
+| Свободно на диске | 15 ГБ | **33 ГБ** | Лучше, но это всё ещё ~7 %; цель — 50–70 ГБ |
+| Своп | 5,1 / 6 ГБ | **6,0 / 7 ГБ** | Растёт: система добавила ещё один файл подкачки |
+| Wired-память (не выгружается) | 3,3 ГБ | **4,6 ГБ** | +1,3 ГБ за 20 минут. Совпало с запуском Xcode — проверить |
+| WindowServer, память | 819 МБ | **1175 МБ** | +43 % за 20 минут → довод в пользу C16 (распухание) |
+| WindowServer, CPU | 25–41 % | 23–24 % | Стабильно высоко в простое |
+| kernel_task, CPU | 6 % | **31 %** | ⚠️ Вырос после отключения FanControl. Две версии: (а) штатная кривая вентиляторов тише → горячее → kernel_task «держит» CPU (тепловая защита); (б) обслуживание свопа. `CPU_Speed_Limit` = 100 → формального троттлинга нет. Без температур (sudo) не различить |
+| FanControl | 14 % | — | Убран |
+| Троттлинг | нет | нет | — |
+
+**Вывод:** расчистка и отключение FanControl простоя не облегчили. Нагрузку FanControl сменил kernel_task. Нужен замер температуры: если CPU горячий (> 90 °C) при простое — это C04 (пыль/термопаста), и FanControl, вероятно, маскировал её, раскручивая вентиляторы.
+
 ## 3б. Журнал наших проверок
 
 | Дата | Что сделали | Как проверили | Результат | Затронуто |
@@ -223,8 +241,10 @@
 | 13.11 | Поиск, кто держит AMD | Мониторинг системы → «Энергия» → «Требуется высокопроизв. GPU» | **Telegram** | C18 |
 | 13.11 | FanControl отключён | Наблюдение владельца: не реагировал на ручные настройки, 14 % CPU | Гипотеза владельца: не получил прав на helper и крутился вхолостую без видимой ошибки. Ждём отчёт №2 | C17 |
 | 13.11 | Telegram: анимации выкл., перезапуск | Мониторинг системы → «Энергия» | **Не помогло**, AMD по-прежнему занята | C18, A18b |
-| — | `pmset -b gpuswitch 0` | запланировано | — | C18, A18e |
-| — | Перезагрузка + отчёт №2 с sudo | запланировано | — | C16, C04, C17 |
+| 13.11 | Флаг `NSSupportsAutomaticGraphicsSwitching` у Telegram | `defaults read …/Telegram.app/Contents/Info …` | **= 1** — флаг есть, гипотеза A18f **опровергнута** | C18 |
+| 13.11 | `pmset -b gpuswitch 0` | — | **Отклонено владельцем** как костыль | A18e |
+| 13.11 | Отчёт №2: FanControl выкл., диск расчищен | `collect-facts.sh` (старая версия, без sudo), батарея | см. §3в | C08, C16, C17 |
+| — | Перезагрузка + отчёт №3 с sudo | запланировано | — | C16, C04, C17 |
 
 ---
 
@@ -303,3 +323,7 @@ S3 — кандидат в «нашу утилиту»: переключение
 - [Mole: Mac fan control apps compared](https://mole.fit/blog/mac-fan-control-apps)
 - [Double Commander: NSSupportsAutomaticGraphicsSwitching fix](https://doublecmd.sourceforge.io/mantisbt/view.php?id=1668)
 - [Mozilla VPN: discrete GPU on Intel MacBooks](https://https-github_com.proxy.bugsmash.io/mozilla-mobile/mozilla-vpn-client/issues/9660)
+- [Apple Developer Forums: Dynamic switching problems with Metal on Big Sur](https://developer.apple.com/forums/thread/675411)
+- [Apple Developer Forums: MetalKit app launches slow, kernel_task kicks in](https://developer.apple.com/forums/thread/692769)
+- [Zed commit: prefer low-power GPU on macOS](https://git.secluded.site/zed/commit/bb514c158e1604916b32fc8c9bbe602a78727742)
+- [Developer PSA: The Discrete GPU and You](https://supermegaultragroovy.com/2016/12/10/auto-graphics-switching/)
